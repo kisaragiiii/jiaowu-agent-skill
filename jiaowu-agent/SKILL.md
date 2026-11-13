@@ -11,7 +11,9 @@ description: 使用教务Agent处理教务转案导表、学员和企业查询�
 
 首次调用直接运行 `node scripts/setup.mjs`，无需再问是否安装 CLI。脚本检查并按官方方式安装钉钉 CLI 和 AI 表格 Skill；已有可用环境直接复用。未登录时发起钉钉本人授权，授权必须由本人完成，不索要密码或 Token。安装失败时说明具体阻碍，不假装已接通。不支持 Node/命令执行的平台不能靠上传文件启用，提示使用支持工具执行的客户端或负责人提供的专用连接器。
 
-运行 `node scripts/agent.mjs me` 读取本人状态和启用能力。若缺少个人连接，接收负责人私下提供的连接文件，以 `node scripts/setup.mjs --connection 文件路径` 导入。公开下载的 Skill 不包含个人凭据。不要在对话里展示连接文件内容。
+负责人提供本人登录服务地址时，先运行 `node scripts/setup.mjs --server https://负责人地址/v1`，将返回的 loginUrl 交给本人在浏览器完成钉钉登录。本人确认登录完成后运行 `node scripts/setup.mjs --login-status`；pending_approval 表示等待负责人在后台绑定身份，不反复轮询。connected 后运行 `node scripts/agent.mjs me` 核对本人状态。设备私钥只留在本人机器的配置目录，不上传、不展示、不复制给别人；通用 Skill 和同一个登录入口可以共用，个人连接和设备私钥不能共用。18:00 复核未通过时按服务端提示重新登录，不绕过权限。
+
+尚未启用本人登录的旧环境，才接收负责人私下提供的连接文件，以 `node scripts/setup.mjs --connection 文件路径` 导入。公开 Skill 不含凭据。负责人启用本人登录后旧共享凭据将被拒绝，不能退回旧模式。
 
 ## 首次配置与日常使用
 
