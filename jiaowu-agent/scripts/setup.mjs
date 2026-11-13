@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, chmodSync, cpSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -23,7 +25,27 @@ export function saveConnection(config) {
   writeFileSync(target, JSON.stringify(config, null, 2), { mode: 0o600 });
   chmodSync(target, 0o600);
 }
+export async function deviceLogin(args) {
+  const state=configDirectory(); mkdirSync(state,{recursive:true,mode:0o700}); chmodSync(state,0o700);
+  const pendingFile=join(state,'login-pending.json');
+  const post=async(base,path,input)=>{const response=await fetch(base.replace(/\/$/,'')+'/identity/'+path,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(30000)});const result=await response.json();if(!response.ok)throw Error(result.error || '登录未完成');return result;};
+  if(args[0]==='--server') {
+    const base=validBase(args[1]).href.replace(/\/$/,'');
+    const pair=generateKeyPairSync('ed25519'),keyFile='device-'+randomUUID()+'.pem';
+    const result=await post(base,'start',{label:hostname().slice(0,80),publicKey:pair.publicKey.export({type:'spki',format:'pem'})});
+    writeFileSync(join(state,keyFile),pair.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});
+    writeFileSync(pendingFile,JSON.stringify({base,keyFile,id:result.id,pollSecret:result.pollSecret}),{mode:0o600});chmodSync(pendingFile,0o600);
+    return {status:'waiting_login',loginUrl:result.loginUrl,next:'本人在浏览器完成钉钉登录，负责人首次批准绑定后，运行 node scripts/setup.mjs --login-status。请核对这是本人发起的设备连接。'};
+  }
+  const pending=JSON.parse(readFileSync(pendingFile,'utf8')); validBase(pending.base);
+  const result=await post(pending.base,'poll',{id:pending.id,pollSecret:pending.pollSecret});
+  if(result.status!=='connected')return {status:result.status,next:result.status==='pending_approval'?'等待负责人在后台批准本人身份后再查询':'请先在浏览器完成本人钉钉登录'};
+  saveConnection({...result,deviceKey:pending.keyFile});
+  // Never print the returned bearer or private key.
+  return {status:'connected',memberId:result.memberId,deviceId:result.deviceId,next:'运行 node scripts/agent.mjs me 核对本人状态'};
+}
 export async function setup(args = process.argv.slice(2), execute = run) {
+  if (['--server','--login-status'].includes(args[0])) return deviceLogin(args);
   if (args[0] === '--connection') {
     if (!args[1]) throw Error('缺少个人连接文件路径');
     saveConnection(JSON.parse(readFileSync(resolve(args[1]), 'utf8')));
@@ -91,5 +113,5 @@ export async function setup(args = process.argv.slice(2), execute = run) {
   return { cli: true, authenticated: identity?.authenticated === true, user: identity?.user_name, organization: identity?.corp_name, connected: existsSync(join(state, 'connection.json')) || existsSync(resolve(dirname(fileURLToPath(import.meta.url)), '../connection.json')), businessExecution: '由个人接口返回的 capabilities 决定' };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  setup().then(value => console.log(JSON.stringify(value))).catch(() => { console.error('启用未完成：请检查 Node/npm、网络和钉钉本人授权。连接凭据未输出。'); process.exitCode = 1; });
+  setup().then(value => console.log(JSON.stringify(value))).catch(() => { console.error(process.argv.includes('--server') || process.argv.includes('--login-status') ? '本人连接未完成：请检查负责人服务是否启用身份登录、浏览器登录及身份审批状态；不要重复领取已完成的连接。凭据未输出。' : '启用未完成：请检查 Node/npm、网络和钉钉本人授权。连接凭据未输出。'); process.exitCode = 1; });
 }
