@@ -25,3 +25,9 @@
 [下载通用 Skill 安装包](https://github.com/kisaragiiii/jiaowu-agent-skill/raw/refs/heads/main/jiaowu-agent-skill.zip)，解压后将完整 jiaowu-agent 目录交给智能体，说“安装并启用教务Agent”。SHA256SUMS 用于核验安装包。
 
 此仓库仅发布通用客户端源码和安装包。负责人后台、完整人设、业务规则、真实表信息、SOP 和个人凭据均不公开。不要将个人包或 connection.json 上传到 GitHub。
+
+## 本人身份与设备连接
+
+负责人启用钉钉身份登录后，使用其提供的 HTTPS 服务地址运行 `node scripts/setup.mjs --server https://负责人地址/v1`。本人打开返回的登录链接，完成钉钉登录，首次等待负责人绑定成员，再运行 `node scripts/setup.mjs --login-status` 领取本设备连接。最后运行 `node scripts/agent.mjs me` 核验本人状态。不要反复轮询。
+
+公开 Skill 和登录入口可共用；设备私钥保存在本人机器配置目录，不上传、不随连接文件转发。连接配置单独复制到另一台机器无法通过设备签名校验；完整私钥和凭据一起泄露仍有被冒用风险。负责人可即时暂停成员或撤销设备；钉钉登录授权每天北京时间18:00复核，错过后恢复补查。未配置官方登录应用时不冒充身份已核验，旧环境按负责人提供的接入方式使用。
