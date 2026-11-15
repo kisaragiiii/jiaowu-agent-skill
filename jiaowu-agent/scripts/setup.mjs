@@ -35,11 +35,11 @@ export async function deviceLogin(args) {
     const result=await post(base,'start',{label:hostname().slice(0,80),publicKey:pair.publicKey.export({type:'spki',format:'pem'})});
     writeFileSync(join(state,keyFile),pair.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});
     writeFileSync(pendingFile,JSON.stringify({base,keyFile,id:result.id,pollSecret:result.pollSecret}),{mode:0o600});chmodSync(pendingFile,0o600);
-    return {status:'waiting_login',loginUrl:result.loginUrl,next:'本人在浏览器完成钉钉登录，负责人首次批准绑定后，运行 node scripts/setup.mjs --login-status。请核对这是本人发起的设备连接。'};
+    return {status:'pending_approval',requestCode:result.requestCode,fingerprint:result.fingerprint,expiresAt:result.expiresAt,next:'将申请编号通过熟悉的渠道告诉负责人，待其批准后运行 node scripts/setup.mjs --login-status。无需钉钉开发者应用。'};
   }
   const pending=JSON.parse(readFileSync(pendingFile,'utf8')); validBase(pending.base);
   const result=await post(pending.base,'poll',{id:pending.id,pollSecret:pending.pollSecret});
-  if(result.status!=='connected')return {status:result.status,next:result.status==='pending_approval'?'等待负责人在后台批准本人身份后再查询':'请先在浏览器完成本人钉钉登录'};
+  if(result.status!=='connected')return {status:result.status,next:'等待负责人批准申请编号后再查询，不反复轮询'};
   saveConnection({...result,deviceKey:pending.keyFile});
   // Never print the returned bearer or private key.
   return {status:'connected',memberId:result.memberId,deviceId:result.deviceId,next:'运行 node scripts/agent.mjs me 核对本人状态'};
