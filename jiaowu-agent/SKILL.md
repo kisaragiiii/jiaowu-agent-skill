@@ -11,11 +11,17 @@ description: 使用教务Agent处理教务转案导表、学员和企业查询�
 
 首次调用直接运行 `node scripts/setup.mjs`，无需再问是否安装 CLI。脚本检查并按官方方式安装钉钉 CLI 和 AI 表格 Skill；已有可用环境直接复用。未登录时发起钉钉本人授权，授权必须由本人完成，不索要密码或 Token。安装失败时说明具体阻碍，不假装已接通。不支持 Node/命令执行的平台不能靠上传文件启用，提示使用支持工具执行的客户端或负责人提供的专用连接器。
 
-负责人提供本人登录服务地址时，先运行 `node scripts/setup.mjs --server https://负责人地址/v1`，将返回的 loginUrl 交给本人在浏览器完成钉钉登录。本人确认登录完成后运行 `node scripts/setup.mjs --login-status`；pending_approval 表示等待负责人在后台绑定身份，不反复轮询。connected 后运行 `node scripts/agent.mjs me` 核对本人状态。设备私钥只留在本人机器的配置目录，不上传、不展示、不复制给别人；通用 Skill 和同一个登录入口可以共用，个人连接和设备私钥不能共用。18:00 复核未通过时按服务端提示重新登录，不绕过权限。
+负责人提供设备申请服务地址时，在环境准备后运行 `node scripts/setup.mjs --server https://负责人地址/v1`，把返回的 requestCode（申请编号）和公钥指纹告诉教务，请其通过熟悉的渠道发给负责人。负责人选定成员并批准后，运行 `node scripts/setup.mjs --login-status`；pending_approval 表示仍待批准，不反复轮询。connected 后运行 `node scripts/agent.mjs me` 核对本人状态。这个过程不需要钉钉开发者应用，身份由负责人确认，不能称为钉钉官方身份核验。CLI 的本人钉钉授权仍需独立完成。
 
-尚未启用本人登录的旧环境，才接收负责人私下提供的连接文件，以 `node scripts/setup.mjs --connection 文件路径` 导入。公开 Skill 不含凭据。负责人启用本人登录后旧共享凭据将被拒绝，不能退回旧模式。
+设备私钥只留在本人机器的配置目录，不上传、不展示、不复制给别人；通用 Skill 和申请入口可共用，个人连接和设备私钥不能共用。每日18:00复核后台授权名单，Mac离线恢复后补查；停用时联系负责人，不绕过权限。旧环境仅在负责人尚未启用设备审批时，可用 `node scripts/setup.mjs --connection 文件路径` 导入私下提供的连接文件；启用设备审批后旧共享凭据永久失效。
 
 ## 首次配置与日常使用
+
+客户端2.0.0会在每次业务操作前自动读取`me`，按当次返回的capabilities、configuration和transferSourceContract工作。无需教务说“刷新me”，普通规则更新也不重跑首次配置。完整人设与内部规则不自动下发；服务端始终校验当前授权。脚本不会自动下载或执行后台提供的代码；出现client_update_required时，按原GitHub入口升级一次Skill，保留本人连接和设备私钥，不重新发放凭据。
+
+准备submit、table、configure、id-column、ask的JSON时，加入本次最新`me.clientSync.revision`作为`_agentConfigRevision`。这是本地请求元数据，脚本会移除，不写表。若尚无最新版本，直接调用业务脚本即可自动检查；返回configuration_changed且written=false时，使用返回的latest更新理解、重新准备尚未执行的请求并补上最新revision，保留原请求编号，自动继续至多一次，不要求教务再次确认。不要只替换版本号而保留已失效的字段或旧口径。若规则继续变化则说明后台正在调整，稍后再试。
+
+runtimeSync.changed=true时读取附带latest；未变化只返回版本摘要。新旧对话可能共享本机缓存，因此写请求必须带其作者实际读到的revision，不能用缓存推测。预检失败时不提交业务，也不使用离线缓存继续操作。已有unknown、partial或已发送但未得到回执的请求仍须按原编号查回执，不因版本变化改内容或重新写入；receipt、request、reconcile仅作恢复查询，升级期间仍可用。
 
 教务使用当前智能体自带的模型理解自然语言，无需负责人另购模型 API。负责人后台控制业务授权、配置和 Skill 开关。用 me 中的 agent.name、agent.welcome 和可用能力呈现本人 Agent，不猜测未返回的完整人设。制度、产品、沟通话术和客诉回答必须有获准的知识依据；当前客户端尚未提供供本地模型使用的独立 SOP 检索接口，不能声称已接入或编造 SOP 回答。
 
